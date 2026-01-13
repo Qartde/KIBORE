@@ -41,10 +41,10 @@ const date = moment().format('DD/MM/YYYY');
   https://criss-xbot-x15p.onrender.com/
 
  *SCAN QR CODE*
-  https://criss-md-bot-qr.onrender.com/qr
+  https://rahmani-4.onrender.com/pair
  
  *BOT REPO*
-  https://github.com/Qartde/Rahmani_Md
+  https://github.com/Qartde/KIBORE
  `;
     
 let menuMsg = `
@@ -120,13 +120,13 @@ const date = moment().format('DD/MM/YYYY');
    *RAHMANI MD IMPORTANT INFO* 
 ❒───────────────────❒
 *GITHUB LINK*
-> https://github.com/Qartde/Rahmani_Md
+> https://github.com/Qartde/KIBORE
 
 *WHATSAPP CHANNEL*
-> https://whatsapp.com/channel/0029VavShWD1iUxb6kjV6K2T
+> https://whatsapp.com/channel/0029VatokI45EjxufALmY32X
 
 *FOR MORE INFO TAP ON THE LINK BELOW*
-> https://chat.whatsapp.com/D3dnvm4vsn9HafO6wkqnzF
+> https://chat.whatsapp.com/DTnrZzULVtP5r0E9rhoFOj
 ╭───────────────────❒
 │❒⁠⁠⁠⁠ *RAM* : ${format(os.totalmem() - os.freemem())}/${format(os.totalmem())}
 │❒⁠⁠⁠⁠ *DEV* : *Rahmani Md*
