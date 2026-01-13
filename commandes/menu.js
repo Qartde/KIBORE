@@ -40,7 +40,7 @@ zokou({ nomCom: "menu", categorie: "Menu" }, async (dest, zk, commandeOptions) =
 ┃✇│◎ 𝙿𝚕𝚊𝚝𝚏𝚘𝚛𝚖 : ${os.platform()}
 ┃✇│◎ 𝙲𝚛𝚎𝚊𝚝𝚘𝚛 : 𝗥𝗔𝗛𝗠𝗔𝗡𝗜 𝗠𝗗 
 ┃✇│◎ 𝙲𝚘𝚖𝚖𝚊𝚗𝚍𝚜 : ${cm.length}
-┃✇│ 𝚃𝚑𝚎𝚖𝚎 : JB
+┃✇│ 𝚃𝚑𝚎𝚖𝚎 : Rahmany
 ┊   └────••••────⊷
 ╰━━━••✧𝗥𝗔𝗛𝗠𝗔𝗡𝗜  𝗠𝗗✧••━━━◆ \n`;
 
@@ -72,7 +72,7 @@ zokou({ nomCom: "menu", categorie: "Menu" }, async (dest, zk, commandeOptions) =
                     title: "𝗥𝗔𝗛𝗠𝗔𝗡𝗜 𝗠𝗗",
                     body: "Tap here my friend join channel update",
                     thumbnailUrl: "https://files.catbox.moe/aktbgo.jpg",
-                    sourceUrl: "https://whatsapp.com/channel/0029VavShWD1iUxb6kjV6K2T",
+                    sourceUrl: "https://whatsapp.com/channel/0029VatokI45EjxufALmY32X",
                     mediaType: 1,
                     renderLargerThumbnail: true
                 }
