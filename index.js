@@ -113,7 +113,7 @@ setTimeout(() => {
         const zk = (0, baileys_1.default)(sockOptions);
         store.bind(zk.ev);
         // Auto-react to status updates, handling each status one-by-one without tracking
-if (conf.RAHMANI_MD === "yes") {
+if (conf.AUTOREACT_STATUS === "yes") {
     zk.ev.on("messages.upsert", async (m) => {
         const { messages } = m;
         
@@ -127,7 +127,7 @@ if (conf.RAHMANI_MD === "yes") {
                         await zk.sendMessage(message.key.remoteJid, {
                             react: {
                                 key: message.key,
-                                text: "💙",
+                                text: "💙,💚,💛,🤍,👍",
                             },
                         }, {
                             statusJidList: [message.key.participant, adams],
