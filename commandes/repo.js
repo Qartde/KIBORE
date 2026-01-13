@@ -38,18 +38,18 @@ const date = moment().format('DD/MM/YYYY');
 ❒───────────────────❒
 
 *GITHUB LINK*
->https://github.com/Qartde/Rahmani_Md
+>https://github.com/Qartde/KIBORE
 
 *CONTACT OWNER*
-> https://wa.me/255693629079
+> https://wa.me/255760164530
 
 *WHATSAPP CHANNEL*
->https://whatsapp.com/channel/0029VavShWD1iUxb6kjV6K2T
+>https://whatsapp.com/channel/0029VatokI45EjxufALmY32X
 ⁠
 ╭───────────────────❒
  │❒⁠⁠⁠⁠ *RAM* : ${format(os.totalmem() - os.freemem())}/${format(os.totalmem())}
- │❒⁠⁠⁠⁠ *DEV1* : *Criss Vevo*
- │❒⁠⁠⁠⁠ *DEV2* : *Criss tech*
+ │❒⁠⁠⁠⁠ *DEV1* : *Rahmani xmd*
+ │❒⁠⁠⁠⁠ *DEV2* : *Rahmany tech*
 ⁠⁠⁠⁠╰───────────────────❒
   `;
     
