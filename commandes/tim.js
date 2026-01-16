@@ -1,7 +1,7 @@
 const { zokou } = require("../framework/zokou");
 
 zokou({
-  nomCom: "rahmany",
+  nomCom: "rah",
   category: "Premium",
   reaction: "🛡️"
 }, async (dest, zk, repondre, ms) => {
