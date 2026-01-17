@@ -83,7 +83,7 @@ fetch(`http://api.brainshop.ai/get?bid=177607&key=NwzhALqeO1kubFVD&uid=[uid]&msg
   
       // Regrouper les arguments en une seule chaîne séparée par "-"
       const question = arg.join(' ');
-      const response = await axios.get(`http://api.maher-zubair.tech/ai/chatgpt4?q=${question}`);
+      const response = await axios.get(`https://lance-frank-asta.onrender.com/api/gpt?q=${question}`);
       
       const data = response.data;
       if (data) {
