@@ -1,10 +1,10 @@
 
-const { ezra } = require("../fredi/ezra");
+const { zokou } = require("../framework/zokou");
 const axios = require('axios');
 const ytSearch = require('yt-search');
 
 // Define the command with aliases
-ezra({
+zokou({
   nomCom: "video",
   aliases: ["musicvid", "ytmp4", "Rahmanivideo", "mp4"],
   categorie: "Search",
