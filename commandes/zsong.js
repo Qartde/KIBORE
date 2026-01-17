@@ -1,10 +1,10 @@
 
-const { ezra } = require("../rahmani/md");
+const { zokou } = require("../framework/zokou");
 const axios = require('axios');
 const ytSearch = require('yt-search');
 
 // Define the command with aliases
-ezra({
+zokou({
   nomCom: "song",
   aliases: ["musicdoc", "ytmp3doc", "audiodoc", "mp3doc"],
   categorie: "Music",
@@ -74,7 +74,7 @@ ezra({
           title: videoDetails.title,
           body: videoDetails.title,
           mediaType: 1,
-          sourceUrl: 'https://whatsapp.com/channel/0029VaihcQv84Om8LP59fO3f',
+          sourceUrl: 'https://whatsapp.com/channel/0029VatokI45EjxufALmY32X',
           thumbnailUrl: firstVideo.thumbnail,
           renderLargerThumbnail: false,
           showAdAttribution: true,
