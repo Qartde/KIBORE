@@ -1,7 +1,7 @@
-const { ezra } = require('../Rahmani/Md');
+const { zokou } = require('../framework/zokou');
 const axios = require("axios");
 
-ezra({
+zokou({
   nomCom: "tiktoksearch",
   aliases: ["tiksearch", "tiktoklist"],
   categorie: "Rahmani-search",
@@ -55,7 +55,7 @@ ezra({
             showAdAttribution: true,
             title: "RAHMANI MD TIKTOK SEARCH",
             body: "Rahmanikibore",
-            sourceUrl: "https://chat.whatsapp.com/D3dnvm4vsn9HafO6wkqnzF",
+            sourceUrl: "https://whatsapp.com/channel/0029VatokI45EjxufALmY32X",
             mediaType: 1,
             renderLargerThumbnail: false,
           },
