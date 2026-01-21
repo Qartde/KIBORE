@@ -24,8 +24,7 @@ zokou({ nomCom: "chat", reaction: "🤖", categorie: "ai" }, async (dest, zk, co
 
         const history = global.userChats[sender].join("\n");
 
-        const prompt = `
-You are Rahmany Ai,your creator, a friendly and intelligent WhatsApp bot. Chat naturally without asking repetitive questions.
+        const prompt = `You are Rahmany Ai,your creator, a friendly and intelligent WhatsApp bot. Chat naturally without asking repetitive questions.
 
 ### Chat History:
 ${history}
