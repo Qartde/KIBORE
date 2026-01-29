@@ -1,126 +1,98 @@
 const { zokou } = require("../framework/zokou");
 const axios = require("axios");
-const ytSearch = require("yt-search");
 const config = require("../set");
 
-/**
- * Build WhatsApp contextInfo
- */
-const buildContextInfo = (
-  bodyText = "",
-  mentionedJid = "",
-  thumbnail = ""
-) => ({
-  mentionedJid: [mentionedJid],
-  forwardingScore: 999999,
-  isForwarded: true,
-  forwardedNewsletterMessageInfo: {
-    newsletterJid: "120363353854480831@newsletter",
-    newsletterName: "ʀᴀʜᴍᴀɴ xᴍᴅ",
-    serverMessageId: Math.floor(100000 + Math.random() * 900000),
+/* ===== VERIFIED CONTACT ===== */
+const quotedContact = {
+  key: {
+    fromMe: false,
+    participant: "0@s.whatsapp.net",
+    remoteJid: "status@broadcast"
   },
-  externalAdReply: {
-    showAdAttribution: true,
-    title: config.BOT || "YouTube Downloader",
-    body: bodyText || "Media Downloader",
-    thumbnailUrl: thumbnail || config.URL || "",
-    sourceUrl: config.GURL || "",
-    mediaType: 1,
-    renderLargerThumbnail: false,
-  },
-});
-
-/**
- * Search YouTube
- */
-async function searchYouTube(query) {
-  const result = await ytSearch(query);
-  if (!result.videos || !result.videos.length) {
-    throw new Error("No video found.");
+  message: {
+    contactMessage: {
+      displayName: "BMB TECH VERIFIED ✅",
+      vcard: `BEGIN:VCARD
+VERSION:3.0
+FN:BMB TECH VERIFIED ✅
+ORG:BMB TECH BOT;
+TEL;type=CELL;type=VOICE;waid=${config.OWNER_NUMBER || "0000000000"}:+${config.OWNER_NUMBER || "0000000000"}
+END:VCARD`
+    }
   }
-  return result.videos[0];
-}
+};
 
-/* ======================
-   AUDIO / MP3 COMMAND
-====================== */
 zokou(
   {
     nomCom: "play",
-    aliases: ["song", "playdoc", "audio", "mp3"],
-    categorie: "download",
-    reaction: "🎸",
+    alias: ["ytmp3"],
+    categorie: "Main",
+    reaction: "🎶"
   },
-  async (chatId, client, data) => {
-    const { arg, ms, userJid } = data;
+  async (from, conn, context) => {
+
+    const { arg, repondre, ms } = context;
+    const q = arg.join(" ");
+
+    /* ===== NEWSLETTER CONTEXT ===== */
+    const newsletterContext = {
+      mentionedJid: [ms.key.participant || ms.participant || from],
+      forwardingScore: 999,
+      isForwarded: true,
+      forwardedNewsletterMessageInfo: {
+        newsletterJid: "120363382023564830@newsletter",
+        newsletterName: "Bmb",
+        serverMessageId: 143
+      }
+    };
 
     try {
-      if (!arg[0]) {
-        return repondre(client, chatId, ms, "Please provide a song name.");
+      if (!q) {
+        return repondre("❗ Please provide a song name.");
       }
 
-      const query = arg.join(" ");
-      const video = await searchYouTube(query);
-      const videoUrl = video.url;
-
-      await client.sendMessage(
-        chatId,
-        {
-          text: "🎵 *ʀᴀʜᴍᴀɴ xᴍᴅ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴀᴜᴅɪᴏ*...",
-          contextInfo: buildContextInfo(
-            "Downloading audio",
-            userJid,
-            video.thumbnail
-          ),
-        },
-        { quoted: ms }
-      );
-
-              // Using your requested API with the song name from query
-        const apiUrl = `https://apiziaul.vercel.app/api/downloader/ytplaymp3?query=${encodeURIComponent(query)}`;
-
-      const res = await axios.get(api, {
-        responseType: "arraybuffer",
-        timeout: 60000,
+      // ⏳ Reaction processing
+      await conn.sendMessage(from, {
+        react: { text: "⏳", key: ms.key }
       });
 
-      const audioBuffer = Buffer.from(res.data);
+      const apiUrl = `https://apis.davidcyriltech.my.id/play?query=${encodeURIComponent(q)}`;
+      const { data } = await axios.get(apiUrl);
 
-      // 🔊 Send audio
-      await client.sendMessage(
-        chatId,
+      if (!data.status || !data.result?.download_url) {
+        await conn.sendMessage(from, {
+          react: { text: "❌", key: ms.key }
+        });
+        return repondre("❌ No audio found or API error.");
+      }
+
+      const song = data.result;
+
+      await conn.sendMessage(
+        from,
         {
-          audio: audioBuffer,
+          audio: { url: song.download_url },
           mimetype: "audio/mpeg",
-          caption: `🎵 *${video.title}*`,
-          contextInfo: buildContextInfo(
-            video.title,
-            userJid,
-            video.thumbnail
-          ),
+          fileName: `${song.title}.mp3`,
+          contextInfo: newsletterContext
         },
-        { quoted: ms }
+        { quoted: quotedContact }
       );
 
-      // 📁 Send document (mp3)
-      await client.sendMessage(
-        chatId,
-        {
-          document: audioBuffer,
-          mimetype: "audio/mpeg",
-          fileName: `${video.title}.mp3`.replace(/[^\w\s.-]/gi, ""),
-          caption: `📁 *${video.title}*`,
-          contextInfo: buildContextInfo(
-            video.title,
-            userJid,
-            video.thumbnail
-          ),
-        },
-        { quoted: ms }
-      );
+      await conn.sendMessage(from, {
+        react: { text: "✅", key: ms.key }
+      });
+
+      await repondre(`🎵 *${song.title}*\nDownloaded Successfully ✅`);
+
     } catch (err) {
-      console.error("Audio download error:", err);
-      repondre(client, chatId, ms, "❌ Download failed.");
+      console.error("PLAY ERROR:", err);
+
+      await conn.sendMessage(from, {
+        react: { text: "❌", key: ms.key }
+      });
+
+      repondre("⚠️ Error occurred. Try again.");
     }
   }
 );
