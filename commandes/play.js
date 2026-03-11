@@ -1,98 +1,184 @@
 const { zokou } = require("../framework/zokou");
 const axios = require("axios");
-const config = require("../set");
+const yts = require("yt-search");
+const fs = require("fs-extra");
+const path = require("path");
 
-/* ===== VERIFIED CONTACT ===== */
-const quotedContact = {
-  key: {
-    fromMe: false,
-    participant: "0@s.whatsapp.net",
-    remoteJid: "status@broadcast"
-  },
-  message: {
-    contactMessage: {
-      displayName: "BMB TECH VERIFIED ✅",
-      vcard: `BEGIN:VCARD
-VERSION:3.0
-FN:BMB TECH VERIFIED ✅
-ORG:BMB TECH BOT;
-TEL;type=CELL;type=VOICE;waid=${config.OWNER_NUMBER || "0000000000"}:+${config.OWNER_NUMBER || "0000000000"}
-END:VCARD`
-    }
-  }
-};
+// Ensure temp folder exists
+if (!fs.existsSync('./temp')) fs.mkdirSync('./temp');
 
-zokou(
-  {
+zokou({
     nomCom: "play",
-    alias: ["ytmp3"],
-    categorie: "Main",
-    reaction: "🎶"
-  },
-  async (from, conn, context) => {
+    categorie: "Music",
+    reaction: "🎵",
+    desc: "Download music from YouTube",
+    fromMe: false
+}, async (dest, zk, commandeOptions) => {
+    const { repondre, arg, ms } = commandeOptions;
 
-    const { arg, repondre, ms } = context;
-    const q = arg.join(" ");
+    if (!arg || arg.length === 0) {
+        return repondre("❌ *Tafadhali weka jina la wimbo!*\n\nExample: .play Diamond Platnumz Inama");
+    }
 
-    /* ===== NEWSLETTER CONTEXT ===== */
-    const newsletterContext = {
-      mentionedJid: [ms.key.participant || ms.participant || from],
-      forwardingScore: 999,
-      isForwarded: true,
-      forwardedNewsletterMessageInfo: {
-        newsletterJid: "120363382023564830@newsletter",
-        newsletterName: "Bmb",
-        serverMessageId: 143
-      }
-    };
+    const query = arg.join(" ");
+    await repondre(`🔍 *Natafuta:* ${query}...`);
 
     try {
-      if (!q) {
-        return repondre("❗ Please provide a song name.");
-      }
+        // ============ STEP 1: SEARCH YOUTUBE ============
+        const search = await yts(query);
+        if (!search.videos.length) {
+            return repondre("❌ *Hakuna wimbo uliopatikana!*");
+        }
 
-      // ⏳ Reaction processing
-      await conn.sendMessage(from, {
-        react: { text: "⏳", key: ms.key }
-      });
+        const video = search.videos[0];
+        const videoUrl = video.url;
+        const videoTitle = video.title;
+        const videoDuration = video.timestamp;
+        const videoThumb = video.thumbnail;
+        const videoChannel = video.author.name;
 
-      const apiUrl = `https://apis.davidcyriltech.my.id/play?query=${encodeURIComponent(q)}`;
-      const { data } = await axios.get(apiUrl);
+        // Send song info
+        const infoMsg = `╭━━━ *『 RAHMANI MUSIC 』* ━━━╮
+┃
+┃ 🎵 *Title:* ${videoTitle}
+┃ ⏱️ *Duration:* ${videoDuration}
+┃ 👤 *Channel:* ${videoChannel}
+┃
+┃ ⏳ *Downloading audio...*
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+_Powered by RAHMANI-XMD_`;
 
-      if (!data.status || !data.result?.download_url) {
-        await conn.sendMessage(from, {
-          react: { text: "❌", key: ms.key }
-        });
-        return repondre("❌ No audio found or API error.");
-      }
+        await zk.sendMessage(dest, {
+            image: { url: videoThumb },
+            caption: infoMsg
+        }, { quoted: ms });
 
-      const song = data.result;
+        // ============ STEP 2: TRY MULTIPLE DOWNLOAD APIS ============
+        let audioUrl = null;
+        let downloadSuccess = false;
+        let downloadErrors = [];
 
-      await conn.sendMessage(
-        from,
-        {
-          audio: { url: song.download_url },
-          mimetype: "audio/mpeg",
-          fileName: `${song.title}.mp3`,
-          contextInfo: newsletterContext
-        },
-        { quoted: quotedContact }
-      );
+        // API 1: y2mate (via API)
+        try {
+            console.log("📡 Trying API 1: y2mate...");
+            const api1Url = `https://y2mate.guru/api/convert?url=${encodeURIComponent(videoUrl)}&type=audio`;
+            const api1Res = await axios.get(api1Url, { timeout: 15000 });
+            
+            if (api1Res.data && api1Res.data.url) {
+                audioUrl = api1Res.data.url;
+                downloadSuccess = true;
+                console.log("✅ API 1 success!");
+            }
+        } catch (e) {
+            downloadErrors.push(`API 1 failed: ${e.message}`);
+        }
 
-      await conn.sendMessage(from, {
-        react: { text: "✅", key: ms.key }
-      });
+        // API 2: ytmp3 (rapidapi)
+        if (!downloadSuccess) {
+            try {
+                console.log("📡 Trying API 2: rapidapi...");
+                const api2Url = `https://youtube-mp3-downloader2.p.rapidapi.com/ytmp3/ytmp3/`;
+                const api2Res = await axios.get(api2Url, {
+                    params: { url: videoUrl },
+                    headers: {
+                        'X-RapidAPI-Key': 'f5a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t',
+                        'X-RapidAPI-Host': 'youtube-mp3-downloader2.p.rapidapi.com'
+                    },
+                    timeout: 15000
+                });
+                
+                if (api2Res.data && api2Res.data.link) {
+                    audioUrl = api2Res.data.link;
+                    downloadSuccess = true;
+                    console.log("✅ API 2 success!");
+                }
+            } catch (e) {
+                downloadErrors.push(`API 2 failed: ${e.message}`);
+            }
+        }
 
-      await repondre(`🎵 *${song.title}*\nDownloaded Successfully ✅`);
+        // API 3: savemp3 (free)
+        if (!downloadSuccess) {
+            try {
+                console.log("📡 Trying API 3: savemp3...");
+                const api3Url = `https://savemp3.co/api/convert?url=${encodeURIComponent(videoUrl)}&format=mp3`;
+                const api3Res = await axios.get(api3Url, { timeout: 15000 });
+                
+                if (api3Res.data && api3Res.data.link) {
+                    audioUrl = api3Res.data.link;
+                    downloadSuccess = true;
+                    console.log("✅ API 3 success!");
+                }
+            } catch (e) {
+                downloadErrors.push(`API 3 failed: ${e.message}`);
+            }
+        }
 
-    } catch (err) {
-      console.error("PLAY ERROR:", err);
+        // API 4: converter (backup)
+        if (!downloadSuccess) {
+            try {
+                console.log("📡 Trying API 4: converter...");
+                const videoId = video.videoId;
+                const api4Url = `https://www.yt-download.org/api/button/mp3/${videoId}`;
+                const api4Res = await axios.get(api4Url, { timeout: 15000 });
+                
+                if (api4Res.data && api4Res.data.url) {
+                    audioUrl = api4Res.data.url;
+                    downloadSuccess = true;
+                    console.log("✅ API 4 success!");
+                }
+            } catch (e) {
+                downloadErrors.push(`API 4 failed: ${e.message}`);
+            }
+        }
 
-      await conn.sendMessage(from, {
-        react: { text: "❌", key: ms.key }
-      });
+        // API 5: direct download (last resort)
+        if (!downloadSuccess) {
+            try {
+                console.log("📡 Trying API 5: direct...");
+                const api5Url = `https://api.akuari.my.id/downloader/ytplay?query=${encodeURIComponent(videoUrl)}`;
+                const api5Res = await axios.get(api5Url, { timeout: 15000 });
+                
+                if (api5Res.data && api5Res.data.result && api5Res.data.result.audio) {
+                    audioUrl = api5Res.data.result.audio;
+                    downloadSuccess = true;
+                    console.log("✅ API 5 success!");
+                }
+            } catch (e) {
+                downloadErrors.push(`API 5 failed: ${e.message}`);
+            }
+        }
 
-      repondre("⚠️ Error occurred. Try again.");
+        if (!downloadSuccess || !audioUrl) {
+            console.log("❌ All APIs failed:", downloadErrors);
+            
+            // Send YouTube link as fallback
+            const fallbackMsg = `❌ *Siwezi kupakua wimbo kwa sasa*\n\n🔗 *Link:* ${videoUrl}\n\n📝 *Title:* ${videoTitle}\n\n_Try downloading manually_`;
+            
+            return await repondre(fallbackMsg);
+        }
+
+        // ============ STEP 3: SEND AUDIO ============
+        console.log(`✅ Audio URL obtained: ${audioUrl.substring(0, 100)}...`);
+
+        await repondre(`📤 *Inatuma wimbo...*`);
+
+        // Send audio directly from URL
+        await zk.sendMessage(dest, {
+            audio: { url: audioUrl },
+            mimetype: 'audio/mpeg',
+            ptt: false
+        }, { quoted: ms });
+
+        // Send success message
+        const successMsg = `✅ *Wimbo umetumwa!*\n\n🎵 *${videoTitle}*\n⏱️ *Duration:* ${videoDuration}`;
+
+        await repondre(successMsg);
+        console.log(`✅ Play command completed for: ${videoTitle}`);
+
+    } catch (error) {
+        console.error("❌ Play command error:", error);
+        await repondre(`❌ *Kuna tatizo!*\n\n${error.message}`);
     }
-  }
-);
+});
