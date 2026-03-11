@@ -57,6 +57,9 @@ const readmore = more.repeat(4001)
 // Global variable for reaction rate limiting
 global.lastReactionTime = 0;
 
+// ============ MESSAGE STORE FOR ANTI-DELETE ============
+const messageStore = {};
+
 async function authentification() {
     try {
        
@@ -124,6 +127,173 @@ setTimeout(() => {
             if (!ms.message)
                 return;
                 
+            // ============ STORE MESSAGES FOR ANTI-DELETE ============
+            try {
+                const chatId = ms.key.remoteJid;
+                if (!messageStore[chatId]) {
+                    messageStore[chatId] = [];
+                }
+                
+                // Store message with important data
+                messageStore[chatId].push({
+                    key: ms.key,
+                    message: ms.message,
+                    messageTimestamp: ms.messageTimestamp || Date.now() / 1000,
+                    pushName: ms.pushName
+                });
+                
+                // Keep only last 50 messages per chat
+                if (messageStore[chatId].length > 50) {
+                    messageStore[chatId] = messageStore[chatId].slice(-50);
+                }
+            } catch (storeError) {
+                console.log("Message store error:", storeError.message);
+            }
+
+            // ============ CHECK FOR DELETED MESSAGES ============
+            if (conf.ANTIDELETE1 === "yes" || conf.ANTIDELETE2 === "yes" || conf.ADM === "yes") {
+                // Check if this is a protocol message (deleted message)
+                if (ms.message?.protocolMessage && ms.message.protocolMessage.type === 0) {
+                    
+                    console.log("🗑️ DELETED MESSAGE DETECTED!");
+                    
+                    const deletedKey = ms.message.protocolMessage.key;
+                    const chatId = deletedKey.remoteJid;
+                    const messageId = deletedKey.id;
+                    
+                    console.log(`🔍 Looking for message ID: ${messageId} in ${chatId}`);
+                    
+                    // Find the deleted message in our store
+                    let deletedMessage = null;
+                    if (messageStore[chatId]) {
+                        deletedMessage = messageStore[chatId].find(msg => msg.key.id === messageId);
+                    }
+                    
+                    if (deletedMessage) {
+                        console.log("✅ Deleted message found in store!");
+                        
+                        try {
+                            const participant = deletedMessage.key.participant || deletedMessage.key.remoteJid;
+                            const senderNumber = participant.split('@')[0];
+                            const ownerJid = conf.NUMERO_OWNER + "@s.whatsapp.net";
+                            
+                            // Get chat name if group
+                            let chatName = chatId;
+                            if (chatId.endsWith('@g.us')) {
+                                try {
+                                    const groupMeta = await zk.groupMetadata(chatId);
+                                    chatName = groupMeta.subject || chatId;
+                                } catch (e) {}
+                            }
+                            
+                            // Handle different message types
+                            if (deletedMessage.message.conversation) {
+                                // Text message
+                                await zk.sendMessage(ownerJid, {
+                                    text: `╭━━━ *『 DELETED MESSAGE 』* ━━━╮
+┃
+┃ 👤 *Sender:* ${senderNumber}
+┃ 💬 *Chat:* ${chatName}
+┃ 📝 *Content:* 
+┃ ${deletedMessage.message.conversation}
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`
+                                });
+                                console.log("✅ Deleted text sent to owner");
+                            }
+                            else if (deletedMessage.message.extendedTextMessage?.text) {
+                                // Extended text
+                                await zk.sendMessage(ownerJid, {
+                                    text: `╭━━━ *『 DELETED MESSAGE 』* ━━━╮
+┃
+┃ 👤 *Sender:* ${senderNumber}
+┃ 💬 *Chat:* ${chatName}
+┃ 📝 *Content:* 
+┃ ${deletedMessage.message.extendedTextMessage.text}
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`
+                                });
+                                console.log("✅ Deleted extended text sent to owner");
+                            }
+                            else if (deletedMessage.message.imageMessage) {
+                                // Image
+                                const caption = deletedMessage.message.imageMessage.caption || '';
+                                console.log("Downloading image...");
+                                const imagePath = await zk.downloadAndSaveMediaMessage(deletedMessage.message.imageMessage);
+                                await zk.sendMessage(ownerJid, {
+                                    image: { url: imagePath },
+                                    caption: `╭━━━ *『 DELETED IMAGE 』* ━━━╮
+┃
+┃ 👤 *Sender:* ${senderNumber}
+┃ 💬 *Chat:* ${chatName}
+┃ 📝 *Caption:* ${caption}
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`
+                                });
+                                console.log("✅ Deleted image sent to owner");
+                            }
+                            else if (deletedMessage.message.videoMessage) {
+                                // Video
+                                const caption = deletedMessage.message.videoMessage.caption || '';
+                                console.log("Downloading video...");
+                                const videoPath = await zk.downloadAndSaveMediaMessage(deletedMessage.message.videoMessage);
+                                await zk.sendMessage(ownerJid, {
+                                    video: { url: videoPath },
+                                    caption: `╭━━━ *『 DELETED VIDEO 』* ━━━╮
+┃
+┃ 👤 *Sender:* ${senderNumber}
+┃ 💬 *Chat:* ${chatName}
+┃ 📝 *Caption:* ${caption}
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`
+                                });
+                                console.log("✅ Deleted video sent to owner");
+                            }
+                            else if (deletedMessage.message.audioMessage) {
+                                // Audio
+                                console.log("Downloading audio...");
+                                const audioPath = await zk.downloadAndSaveMediaMessage(deletedMessage.message.audioMessage);
+                                await zk.sendMessage(ownerJid, {
+                                    audio: { url: audioPath },
+                                    mimetype: 'audio/mp4'
+                                });
+                                await zk.sendMessage(ownerJid, {
+                                    text: `╭━━━ *『 DELETED AUDIO 』* ━━━╮
+┃
+┃ 👤 *Sender:* ${senderNumber}
+┃ 💬 *Chat:* ${chatName}
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`
+                                });
+                                console.log("✅ Deleted audio sent to owner");
+                            }
+                            else if (deletedMessage.message.stickerMessage) {
+                                // Sticker
+                                console.log("Downloading sticker...");
+                                const stickerPath = await zk.downloadAndSaveMediaMessage(deletedMessage.message.stickerMessage);
+                                await zk.sendMessage(ownerJid, {
+                                    sticker: { url: stickerPath }
+                                });
+                                await zk.sendMessage(ownerJid, {
+                                    text: `╭━━━ *『 DELETED STICKER 』* ━━━╮
+┃
+┃ 👤 *Sender:* ${senderNumber}
+┃ 💬 *Chat:* ${chatName}
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`
+                                });
+                                console.log("✅ Deleted sticker sent to owner");
+                            }
+                            
+                        } catch (sendError) {
+                            console.error("Error sending deleted message:", sendError);
+                        }
+                    } else {
+                        console.log("❌ Deleted message not found in store");
+                    }
+                }
+            }
+            
             // ============ AUTO STATUS - FIXED LIKE FIRST CODE ============
             if (ms.key && ms.key.remoteJid === "status@broadcast") {
                 
@@ -1083,7 +1253,7 @@ zk.ev.on('group-participants.update', async (group) => {
                     }, timeout);
                 }
             });
-        }
+        };
 
 
 
