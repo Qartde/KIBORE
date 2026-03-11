@@ -112,37 +112,81 @@ setTimeout(() => {
         };
         const zk = (0, baileys_1.default)(sockOptions);
         store.bind(zk.ev);
-        // Auto-react to status updates, handling each status one-by-one without tracking
-if (conf.AUTOREACT_STATUS === "yes") {
-    zk.ev.on("messages.upsert", async (m) => {
-        const { messages } = m;
-        
-        for (const message of messages) {
-            if (message.key && message.key.remoteJid === "status@broadcast") {
-                try {
-                    const adams = zk.user && zk.user.id ? zk.user.id.split(":")[0] + "@s.whatsapp.net" : null;
-
-                    if (adams) {
-                        // React to the status with a green heart
-                        await zk.sendMessage(message.key.remoteJid, {
-                            react: {
-                                key: message.key,
-                                text: "💙,💚,💛,🤍,👍",
-                            },
-                        }, {
-                            statusJidList: [message.key.participant, adams],
-                        });
-
-                        // Introduce a short delay between each reaction to prevent overflow
-                        await new Promise(resolve => setTimeout(resolve, 2000)); // 2-second delay
+        // ============ AUTO STATUS - FIXED LIKE FIRST CODE ============
+            if (ms.key && ms.key.remoteJid === "status@broadcast") {
+                
+                console.log("Status detected from:", ms.key.participant?.split('@')[0] || 'unknown');
+                
+                // 1. AUTO READ STATUS
+                if (conf.AUTO_READ_STATUS === "yes") {
+                    try {
+                        await zk.readMessages([ms.key]);
+                        console.log("Status read");
+                    } catch (readError) {
+                        console.log("Auto-read failed:", readError.message);
                     }
-                } catch (error) {
-                    console.error("Error decoding JID or sending message:", error);
                 }
-            }
-        }
-    });
-}
+                
+                // 2. AUTO REACT STATUS - EXACTLY LIKE FIRST CODE
+                if (conf.AUTO_REACT_STATUS === "yes") {
+                    
+                    // Throttling - 5 seconds between reactions
+                    const now = Date.now();
+                    if (now - (global.lastReactionTime || 0) < 5000) {
+                        console.log("Throttling reaction to prevent overflow");
+                    } else {
+                        
+                        // Get bot ID for statusJidList
+                        const botId = zk.user && zk.user.id ? 
+                            zk.user.id.split(":")[0] + "@s.whatsapp.net" : 
+                            null;
+                            
+                        if (!botId) {
+                            console.log("Bot ID not available. Skipping reaction.");
+                        } else {
+                            
+                            try {
+                                // React with ❤ emoji
+                                await zk.sendMessage(ms.key.remoteJid, {
+                                    react: {
+                                        key: ms.key,
+                                        text: "❤",
+                                    }
+                                }, {
+                                    statusJidList: [ms.key.participant, botId],
+                                });
+                                
+                                // Update last reaction time
+                                global.lastReactionTime = Date.now();
+                                console.log(`Reacted to status with ❤`);
+                                
+                                // Delay between reactions
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                
+                            } catch (error) {
+                                console.log("React error:", error.message);
+                                
+                                // Try once more after delay
+                                setTimeout(async () => {
+                                    try {
+                                        await zk.sendMessage(ms.key.remoteJid, {
+                                            react: {
+                                                key: ms.key,
+                                                text: "❤",
+                                            }
+                                        }, {
+                                            statusJidList: [ms.key.participant, botId],
+                                        });
+                                        global.lastReactionTime = Date.now();
+                                        console.log("React success on retry");
+                                    } catch (e) {
+                                        console.log("React retry failed:", e.message);
+                                    }
+                                }, 3000);
+                            }
+                        }
+                    }
+                }
 
         
         zk.ev.on("messages.upsert", async (m) => {
