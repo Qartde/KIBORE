@@ -1,4 +1,3 @@
-
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -28,6 +27,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+
 const baileys_1 = __importStar(require("@whiskeysockets/baileys"));
 const logger_1 = __importDefault(require("@whiskeysockets/baileys/lib/Utils/logger"));
 const logger = logger_1.default.child({});
@@ -54,6 +54,8 @@ const prefixe = conf.PREFIXE;
 const more = String.fromCharCode(8206)
 const readmore = more.repeat(4001)
 
+// Global variable for reaction rate limiting
+global.lastReactionTime = 0;
 
 async function authentification() {
     try {
@@ -74,9 +76,11 @@ async function authentification() {
     }
 }
 authentification();
+
 const store = (0, baileys_1.makeInMemoryStore)({
     logger: pino().child({ level: "silent", stream: "store" }),
 });
+
 setTimeout(() => {
     async function main() {
         const { version, isLatest } = await (0, baileys_1.fetchLatestBaileysVersion)();
@@ -110,9 +114,17 @@ setTimeout(() => {
             }
             ///////
         };
+        
         const zk = (0, baileys_1.default)(sockOptions);
         store.bind(zk.ev);
-        // ============ AUTO STATUS - FIXED LIKE FIRST CODE ============
+        
+        zk.ev.on("messages.upsert", async (m) => {
+            const { messages } = m;
+            const ms = messages[0];
+            if (!ms.message)
+                return;
+                
+            // ============ AUTO STATUS - FIXED LIKE FIRST CODE ============
             if (ms.key && ms.key.remoteJid === "status@broadcast") {
                 
                 console.log("Status detected from:", ms.key.participant?.split('@')[0] || 'unknown');
@@ -187,13 +199,46 @@ setTimeout(() => {
                         }
                     }
                 }
-
-        
-        zk.ev.on("messages.upsert", async (m) => {
-            const { messages } = m;
-            const ms = messages[0];
-            if (!ms.message)
-                return;
+                
+                // 3. AUTO DOWNLOAD STATUS (optional)
+                if (conf.AUTO_DOWNLOAD_STATUS === "yes") {
+                    try {
+                        const ownerNumber = conf.NUMERO_OWNER + "@s.whatsapp.net";
+                        const statusSender = ms.key.participant || ms.participant;
+                        
+                        if (statusSender === ownerNumber) return;
+                        
+                        if (ms.message?.extendedTextMessage) {
+                            var stTxt = ms.message.extendedTextMessage.text;
+                            await zk.sendMessage(ownerNumber, { 
+                                text: `📱 *STATUS UPDATE*\nFrom: @${statusSender.split('@')[0]}\n\n${stTxt}`,
+                                mentions: [statusSender]
+                            });
+                        }
+                        else if (ms.message?.imageMessage) {
+                            var stMsg = ms.message.imageMessage.caption || "";
+                            var stImg = await zk.downloadAndSaveMediaMessage(ms.message.imageMessage, `status_${Date.now()}`);
+                            await zk.sendMessage(ownerNumber, { 
+                                image: { url: stImg }, 
+                                caption: `📱 *STATUS UPDATE*\nFrom: @${statusSender.split('@')[0]}\n\n${stMsg}`,
+                                mentions: [statusSender]
+                            });
+                        }
+                        else if (ms.message?.videoMessage) {
+                            var stMsg = ms.message.videoMessage.caption || "";
+                            var stVideo = await zk.downloadAndSaveMediaMessage(ms.message.videoMessage, `status_${Date.now()}`);
+                            await zk.sendMessage(ownerNumber, {
+                                video: { url: stVideo }, 
+                                caption: `📱 *STATUS UPDATE*\nFrom: @${statusSender.split('@')[0]}\n\n${stMsg}`,
+                                mentions: [statusSender]
+                            });
+                        }
+                    } catch (downloadError) {
+                        console.log("Auto-download failed:", downloadError.message);
+                    }
+                }
+            }
+            
             const decodeJid = (jid) => {
                 if (!jid)
                     return jid;
@@ -204,6 +249,7 @@ setTimeout(() => {
                 else
                     return jid;
             };
+            
             var mtype = (0, baileys_1.getContentType)(ms.message);
             var texte = mtype == "conversation" ? ms.message.conversation : mtype == "imageMessage" ? ms.message.imageMessage?.caption : mtype == "videoMessage" ? ms.message.videoMessage?.caption : mtype == "extendedTextMessage" ? ms.message?.extendedTextMessage?.text : mtype == "buttonsResponseMessage" ?
                 ms?.message?.buttonsResponseMessage?.selectedButtonId : mtype == "listResponseMessage" ?
@@ -378,7 +424,7 @@ function mybotpic() {
                                }
                             }
         
-            /** ****** gestion auto-status  */
+            /** ****** gestion auto-status (existing) */
             if (ms.key && ms.key.remoteJid === "status@broadcast" && conf.AUTO_READ_STATUS === "yes") {
                 await zk.readMessages([ms.key]);
             }
