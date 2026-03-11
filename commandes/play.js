@@ -36,6 +36,7 @@ zokou({
         const videoDuration = video.timestamp;
         const videoThumb = video.thumbnail;
         const videoChannel = video.author.name;
+        const videoId = video.videoId;
 
         // Send song info
         const infoMsg = `╭━━━ *『 RAHMANI MUSIC 』* ━━━╮
@@ -54,15 +55,15 @@ _Powered by RAHMANI-XMD_`;
             caption: infoMsg
         }, { quoted: ms });
 
-        // ============ STEP 2: TRY MULTIPLE DOWNLOAD APIS ============
+        // ============ STEP 2: USE RELIABLE APIs (NO KEY NEEDED) ============
         let audioUrl = null;
         let downloadSuccess = false;
         let downloadErrors = [];
 
-        // API 1: y2mate (via API)
+        // API 1: Akurath (Reliable - No Key)
         try {
-            console.log("📡 Trying API 1: y2mate...");
-            const api1Url = `https://y2mate.guru/api/convert?url=${encodeURIComponent(videoUrl)}&type=audio`;
+            console.log("📡 Trying API 1: Akurath...");
+            const api1Url = `https://api.akurath.com/download/yt?url=${encodeURIComponent(videoUrl)}&type=audio`;
             const api1Res = await axios.get(api1Url, { timeout: 15000 });
             
             if (api1Res.data && api1Res.data.url) {
@@ -71,56 +72,48 @@ _Powered by RAHMANI-XMD_`;
                 console.log("✅ API 1 success!");
             }
         } catch (e) {
-            downloadErrors.push(`API 1 failed: ${e.message}`);
+            downloadErrors.push(`API 1 failed`);
         }
 
-        // API 2: ytmp3 (rapidapi)
+        // API 2: Diioffc (Very Reliable - No Key)
         if (!downloadSuccess) {
             try {
-                console.log("📡 Trying API 2: rapidapi...");
-                const api2Url = `https://youtube-mp3-downloader2.p.rapidapi.com/ytmp3/ytmp3/`;
-                const api2Res = await axios.get(api2Url, {
-                    params: { url: videoUrl },
-                    headers: {
-                        'X-RapidAPI-Key': 'f5a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t',
-                        'X-RapidAPI-Host': 'youtube-mp3-downloader2.p.rapidapi.com'
-                    },
-                    timeout: 15000
-                });
+                console.log("📡 Trying API 2: Diioffc...");
+                const api2Url = `https://api.diioffc.web.id/api/download/yt?url=${encodeURIComponent(videoUrl)}&type=audio`;
+                const api2Res = await axios.get(api2Url, { timeout: 15000 });
                 
-                if (api2Res.data && api2Res.data.link) {
-                    audioUrl = api2Res.data.link;
+                if (api2Res.data && api2Res.data.result && api2Res.data.result.download) {
+                    audioUrl = api2Res.data.result.download;
                     downloadSuccess = true;
                     console.log("✅ API 2 success!");
                 }
             } catch (e) {
-                downloadErrors.push(`API 2 failed: ${e.message}`);
+                downloadErrors.push(`API 2 failed`);
             }
         }
 
-        // API 3: savemp3 (free)
+        // API 3: Y2Mate (No Key)
         if (!downloadSuccess) {
             try {
-                console.log("📡 Trying API 3: savemp3...");
-                const api3Url = `https://savemp3.co/api/convert?url=${encodeURIComponent(videoUrl)}&format=mp3`;
+                console.log("📡 Trying API 3: Y2Mate...");
+                const api3Url = `https://y2mate.guru/api/convert?url=${encodeURIComponent(videoUrl)}&type=audio`;
                 const api3Res = await axios.get(api3Url, { timeout: 15000 });
                 
-                if (api3Res.data && api3Res.data.link) {
-                    audioUrl = api3Res.data.link;
+                if (api3Res.data && api3Res.data.url) {
+                    audioUrl = api3Res.data.url;
                     downloadSuccess = true;
                     console.log("✅ API 3 success!");
                 }
             } catch (e) {
-                downloadErrors.push(`API 3 failed: ${e.message}`);
+                downloadErrors.push(`API 3 failed`);
             }
         }
 
-        // API 4: converter (backup)
+        // API 4: Akurath Alternative (No Key)
         if (!downloadSuccess) {
             try {
-                console.log("📡 Trying API 4: converter...");
-                const videoId = video.videoId;
-                const api4Url = `https://www.yt-download.org/api/button/mp3/${videoId}`;
+                console.log("📡 Trying API 4: Akurath Alternative...");
+                const api4Url = `https://api.akurath.xyz/api/download/yt?url=${encodeURIComponent(videoUrl)}&type=audio`;
                 const api4Res = await axios.get(api4Url, { timeout: 15000 });
                 
                 if (api4Res.data && api4Res.data.url) {
@@ -129,14 +122,14 @@ _Powered by RAHMANI-XMD_`;
                     console.log("✅ API 4 success!");
                 }
             } catch (e) {
-                downloadErrors.push(`API 4 failed: ${e.message}`);
+                downloadErrors.push(`API 4 failed`);
             }
         }
 
-        // API 5: direct download (last resort)
+        // API 5: Akuari (No Key - Last Resort)
         if (!downloadSuccess) {
             try {
-                console.log("📡 Trying API 5: direct...");
+                console.log("📡 Trying API 5: Akuari...");
                 const api5Url = `https://api.akuari.my.id/downloader/ytplay?query=${encodeURIComponent(videoUrl)}`;
                 const api5Res = await axios.get(api5Url, { timeout: 15000 });
                 
@@ -146,7 +139,7 @@ _Powered by RAHMANI-XMD_`;
                     console.log("✅ API 5 success!");
                 }
             } catch (e) {
-                downloadErrors.push(`API 5 failed: ${e.message}`);
+                downloadErrors.push(`API 5 failed`);
             }
         }
 
@@ -160,7 +153,7 @@ _Powered by RAHMANI-XMD_`;
         }
 
         // ============ STEP 3: SEND AUDIO ============
-        console.log(`✅ Audio URL obtained: ${audioUrl.substring(0, 100)}...`);
+        console.log(`✅ Audio URL obtained`);
 
         await repondre(`📤 *Inatuma wimbo...*`);
 
