@@ -17,17 +17,17 @@ zokou({
     const { repondre, arg, ms } = commandeOptions;
 
     if (!arg || arg.length === 0) {
-        return repondre("❌ *Tafadhali weka jina la wimbo!*\n\nExample: .play Diamond Platnumz Inama");
+        return repondre("❌ *Please provide a song name!*\n\nExample: .play Diamond Platnumz Inama");
     }
 
     const query = arg.join(" ");
-    await repondre(`🔍 *Natafuta:* ${query}...`);
+    await repondre(`🔍 *Searching:* ${query}...`);
 
     try {
         // ============ STEP 1: SEARCH YOUTUBE ============
         const search = await yts(query);
         if (!search.videos.length) {
-            return repondre("❌ *Hakuna wimbo uliopatikana!*");
+            return repondre("❌ *No songs found!*");
         }
 
         const video = search.videos[0];
@@ -55,91 +55,111 @@ _Powered by RAHMANI-XMD_`;
             caption: infoMsg
         }, { quoted: ms });
 
-        // ============ STEP 2: USE RELIABLE APIs (NO KEY NEEDED) ============
+        // ============ STEP 2: TRY ALL YOUR PROVIDED APIS ============
         let audioUrl = null;
         let downloadSuccess = false;
         let downloadErrors = [];
 
-        // API 1: Akurath (Reliable - No Key)
-        try {
-            console.log("📡 Trying API 1: Akurath...");
-            const api1Url = `https://api.akurath.com/download/yt?url=${encodeURIComponent(videoUrl)}&type=audio`;
-            const api1Res = await axios.get(api1Url, { timeout: 15000 });
-            
-            if (api1Res.data && api1Res.data.url) {
-                audioUrl = api1Res.data.url;
-                downloadSuccess = true;
-                console.log("✅ API 1 success!");
+        // Your list of APIs (all in English)
+        const apis = [
+            {
+                name: "DavidCyril MP4",
+                url: `https://apis.davidcyriltech.my.id/download/ytmp4?url=${encodeURIComponent(videoUrl)}`,
+                responsePath: "url" // Expected response: { "url": "..." }
+            },
+            {
+                name: "DavidCyril MP3",
+                url: `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(videoUrl)}`,
+                responsePath: "url" // Expected response: { "url": "..." }
+            },
+            {
+                name: "DarkYasiya",
+                url: `https://www.dark-yasiya-api.site/download/ytmp3?url=${encodeURIComponent(videoUrl)}`,
+                responsePath: "url" // Expected response: { "url": "..." }
+            },
+            {
+                name: "GiftedTech",
+                url: `https://api.giftedtech.web.id/api/download/dlmp3?url=${encodeURIComponent(videoUrl)}&apikey=gifted-md`,
+                responsePath: "result.download" // Expected response: { "result": { "download": "..." } }
+            },
+            {
+                name: "Dreaded",
+                url: `https://api.dreaded.site/api/ytdl/audio?url=${encodeURIComponent(videoUrl)}`,
+                responsePath: "url" // Expected response: { "url": "..." }
+            },
+            // Backup APIs (no key needed)
+            {
+                name: "Diioffc",
+                url: `https://api.diioffc.web.id/api/download/yt?url=${encodeURIComponent(videoUrl)}&type=audio`,
+                responsePath: "result.download" // { "result": { "download": "..." } }
+            },
+            {
+                name: "Akurath",
+                url: `https://api.akurath.com/download/yt?url=${encodeURIComponent(videoUrl)}&type=audio`,
+                responsePath: "url" // { "url": "..." }
+            },
+            {
+                name: "Akuari",
+                url: `https://api.akuari.my.id/downloader/ytplay?query=${encodeURIComponent(videoUrl)}`,
+                responsePath: "result.audio" // { "result": { "audio": "..." } }
             }
-        } catch (e) {
-            downloadErrors.push(`API 1 failed`);
-        }
+        ];
 
-        // API 2: Diioffc (Very Reliable - No Key)
-        if (!downloadSuccess) {
+        // Try each API one by one
+        for (const api of apis) {
             try {
-                console.log("📡 Trying API 2: Diioffc...");
-                const api2Url = `https://api.diioffc.web.id/api/download/yt?url=${encodeURIComponent(videoUrl)}&type=audio`;
-                const api2Res = await axios.get(api2Url, { timeout: 15000 });
+                console.log(`📡 Trying API: ${api.name}...`);
+                const response = await axios.get(api.url, { 
+                    timeout: 15000,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    }
+                });
                 
-                if (api2Res.data && api2Res.data.result && api2Res.data.result.download) {
-                    audioUrl = api2Res.data.result.download;
-                    downloadSuccess = true;
-                    console.log("✅ API 2 success!");
+                if (response.data) {
+                    // Handle different response structures
+                    if (api.responsePath === "url" && response.data.url) {
+                        audioUrl = response.data.url;
+                        downloadSuccess = true;
+                        console.log(`✅ ${api.name} success!`);
+                        break;
+                    }
+                    else if (api.responsePath === "result.download" && response.data.result?.download) {
+                        audioUrl = response.data.result.download;
+                        downloadSuccess = true;
+                        console.log(`✅ ${api.name} success!`);
+                        break;
+                    }
+                    else if (api.responsePath === "result.audio" && response.data.result?.audio) {
+                        audioUrl = response.data.result.audio;
+                        downloadSuccess = true;
+                        console.log(`✅ ${api.name} success!`);
+                        break;
+                    }
+                    // Check for alternative response formats
+                    else if (response.data.link) {
+                        audioUrl = response.data.link;
+                        downloadSuccess = true;
+                        console.log(`✅ ${api.name} success (using link)!`);
+                        break;
+                    }
+                    else if (response.data.download) {
+                        audioUrl = response.data.download;
+                        downloadSuccess = true;
+                        console.log(`✅ ${api.name} success (using download)!`);
+                        break;
+                    }
+                    else if (response.data.audio) {
+                        audioUrl = response.data.audio;
+                        downloadSuccess = true;
+                        console.log(`✅ ${api.name} success (using audio)!`);
+                        break;
+                    }
                 }
-            } catch (e) {
-                downloadErrors.push(`API 2 failed`);
-            }
-        }
-
-        // API 3: Y2Mate (No Key)
-        if (!downloadSuccess) {
-            try {
-                console.log("📡 Trying API 3: Y2Mate...");
-                const api3Url = `https://y2mate.guru/api/convert?url=${encodeURIComponent(videoUrl)}&type=audio`;
-                const api3Res = await axios.get(api3Url, { timeout: 15000 });
-                
-                if (api3Res.data && api3Res.data.url) {
-                    audioUrl = api3Res.data.url;
-                    downloadSuccess = true;
-                    console.log("✅ API 3 success!");
-                }
-            } catch (e) {
-                downloadErrors.push(`API 3 failed`);
-            }
-        }
-
-        // API 4: Akurath Alternative (No Key)
-        if (!downloadSuccess) {
-            try {
-                console.log("📡 Trying API 4: Akurath Alternative...");
-                const api4Url = `https://api.akurath.xyz/api/download/yt?url=${encodeURIComponent(videoUrl)}&type=audio`;
-                const api4Res = await axios.get(api4Url, { timeout: 15000 });
-                
-                if (api4Res.data && api4Res.data.url) {
-                    audioUrl = api4Res.data.url;
-                    downloadSuccess = true;
-                    console.log("✅ API 4 success!");
-                }
-            } catch (e) {
-                downloadErrors.push(`API 4 failed`);
-            }
-        }
-
-        // API 5: Akuari (No Key - Last Resort)
-        if (!downloadSuccess) {
-            try {
-                console.log("📡 Trying API 5: Akuari...");
-                const api5Url = `https://api.akuari.my.id/downloader/ytplay?query=${encodeURIComponent(videoUrl)}`;
-                const api5Res = await axios.get(api5Url, { timeout: 15000 });
-                
-                if (api5Res.data && api5Res.data.result && api5Res.data.result.audio) {
-                    audioUrl = api5Res.data.result.audio;
-                    downloadSuccess = true;
-                    console.log("✅ API 5 success!");
-                }
-            } catch (e) {
-                downloadErrors.push(`API 5 failed`);
+            } catch (error) {
+                downloadErrors.push(`${api.name}: ${error.message}`);
+                console.log(`❌ ${api.name} failed: ${error.message}`);
+                continue; // Try next API
             }
         }
 
@@ -147,15 +167,15 @@ _Powered by RAHMANI-XMD_`;
             console.log("❌ All APIs failed:", downloadErrors);
             
             // Send YouTube link as fallback
-            const fallbackMsg = `❌ *Siwezi kupakua wimbo kwa sasa*\n\n🔗 *Link:* ${videoUrl}\n\n📝 *Title:* ${videoTitle}\n\n_Try downloading manually_`;
+            const fallbackMsg = `❌ *Could not download the song*\n\n🔗 *YouTube Link:* ${videoUrl}\n\n📝 *Title:* ${videoTitle}\n\n_Please try downloading manually_`;
             
             return await repondre(fallbackMsg);
         }
 
         // ============ STEP 3: SEND AUDIO ============
-        console.log(`✅ Audio URL obtained`);
+        console.log(`✅ Download successful: ${audioUrl.substring(0, 100)}...`);
 
-        await repondre(`📤 *Inatuma wimbo...*`);
+        await repondre(`📤 *Sending audio...*`);
 
         // Send audio directly from URL
         await zk.sendMessage(dest, {
@@ -165,13 +185,13 @@ _Powered by RAHMANI-XMD_`;
         }, { quoted: ms });
 
         // Send success message
-        const successMsg = `✅ *Wimbo umetumwa!*\n\n🎵 *${videoTitle}*\n⏱️ *Duration:* ${videoDuration}`;
+        const successMsg = `✅ *Song sent successfully!*\n\n🎵 *${videoTitle}*\n⏱️ *Duration:* ${videoDuration}`;
 
         await repondre(successMsg);
         console.log(`✅ Play command completed for: ${videoTitle}`);
 
     } catch (error) {
         console.error("❌ Play command error:", error);
-        await repondre(`❌ *Kuna tatizo!*\n\n${error.message}`);
+        await repondre(`❌ *Error:* ${error.message}`);
     }
 });
