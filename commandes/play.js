@@ -1,197 +1,236 @@
 const { zokou } = require("../framework/zokou");
+const conf = require("../set");
 const axios = require("axios");
 const yts = require("yt-search");
-const fs = require("fs-extra");
-const path = require("path");
 
-// Ensure temp folder exists
-if (!fs.existsSync('./temp')) fs.mkdirSync('./temp');
+// ═══════════════════════════════════════════════
+//   ⚡ RAHMANI-XMD : MEDIA ENGINE
+// ═══════════════════════════════════════════════
 
-zokou({
-    nomCom: "play",
-    categorie: "Music",
-    reaction: "🎵",
-    desc: "Download music from YouTube",
-    fromMe: false
-}, async (dest, zk, commandeOptions) => {
-    const { repondre, arg, ms } = commandeOptions;
+const botUI = {
+    channelJid: "120363353854480831@newsletter",
+    channelLink: "https://whatsapp.com/channel/0029VatokI45EjxufALmY32X",
+    thumbnail: "https://files.catbox.moe/aktbgo.jpg",
+    botName: () => conf.BOT_NAME || "RAHMANI-XMD"
+};
 
-    if (!arg || arg.length === 0) {
-        return repondre("❌ *Please provide a song name!*\n\nExample: .play Diamond Platnumz Inama");
+async function fetchMedia(query, type) {
+    // 1. Search YouTube
+    const ytSearch = await yts(query);
+    if (!ytSearch.videos || ytSearch.videos.length === 0) {
+        throw new Error("No results found on YouTube.");
+    }
+    
+    const bestMatch = ytSearch.videos[0];
+    const ytUrl = bestMatch.url;
+
+    // 2. Choose API based on type
+    let apiEndpoint = type === "audio" 
+        ? "https://apiziaul.vercel.app/api/downloader/ytplaymp3"
+        : "https://apiziaul.vercel.app/api/downloader/ytmp4";
+        
+    let params = type === "audio" ? { query: query } : { url: ytUrl };
+
+    // 3. Fetch data from API
+    const response = await axios.get(apiEndpoint, { params, timeout: 45000 });
+    const json = response.data;
+
+    if (!json.status || !json.result || !json.result.downloadUrl) {
+        throw new Error("API failed to return a valid download link.");
     }
 
-    const query = arg.join(" ");
-    await repondre(`🔍 *Searching:* ${query}...`);
+    return {
+        downloadUrl: json.result.downloadUrl,
+        title: json.result.title || bestMatch.title,
+        duration: bestMatch.timestamp,
+        thumbnail: bestMatch.thumbnail,
+        ytUrl: ytUrl
+    };
+}
+
+function generateCaption(media, type) {
+    const isAudio = type === "audio";
+    return `${isAudio ? "🎵" : "🎥"} *${botUI.botName()} ${isAudio ? "AUDIO" : "VIDEO"}*
+
+┌─────────────────────
+│  📛 *Title:* ${media.title.substring(0, 45)}
+│  ⏱️ *Duration:* ${media.duration}
+│  📦 *Format:* ${isAudio ? "MP3" : "MP4"}
+│
+└─────────────────────
+
+⚡ *Powered by ${botUI.botName()}*
+
+> *View channel*`;
+}
+
+function buildUsageMessage(type) {
+    const isAudio = type === "audio";
+    return `${isAudio ? "🎵" : "🎥"} *${botUI.botName()} ${isAudio ? "PLAY" : "VIDEO"}*
+
+┌─────────────────────
+│  📖 *Usage:*
+│  ▸ .${isAudio ? "play" : "video"} <${isAudio ? "song name" : "video name"}>
+│  ▸ .${isAudio ? "play" : "video"} <youtube link>
+│
+│  💡 *Example:*
+│  ▸ .${isAudio ? "play" : "video"} ${isAudio ? "Faded Alan Walker" : "Despacito"}
+│
+└─────────────────────
+
+> *View channel*`;
+}
+
+function buildErrorBox(errorMsg) {
+    return `❌ *FAILED*
+
+┌─────────────────────
+│  ⚠️ *Error:*
+│  ${errorMsg.substring(0, 150)}
+│
+└─────────────────────
+
+> *View channel*`;
+}
+
+function getContextInfo(media) {
+    return {
+        forwardingScore: 999, 
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: { 
+            newsletterJid: botUI.channelJid, 
+            newsletterName: botUI.botName(), 
+            serverMessageId: 143 
+        },
+        externalAdReply: { 
+            title: `🎵 ${media.title.substring(0, 40)}`, 
+            body: `Downloaded via ${botUI.botName()}`, 
+            mediaType: 1, 
+            mediaUrl: media.ytUrl, 
+            sourceUrl: media.ytUrl, 
+            thumbnailUrl: media.thumbnail || botUI.thumbnail, 
+            showAdAttribution: false, 
+            renderLargerThumbnail: true 
+        }
+    };
+}
+
+// ═══════════════════════════════════════════════
+//   🎵 COMMAND: .play
+// ═══════════════════════════════════════════════
+zokou({
+    nomCom: "play",
+    categorie: "Download",
+    reaction: "🎵",
+    desc: "Download audio from YouTube",
+    fromMe: false
+}, async (dest, client, cmd) => {
+    const { arg, ms, repondre, auteurMessage } = cmd;
+    const query = (arg || []).join(" ").trim();
+
+    if (!query) {
+        return client.sendMessage(dest, {
+            text: buildUsageMessage("audio"),
+            mentions: [auteurMessage],
+            contextInfo: {
+                forwardingScore: 999, 
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: { 
+                    newsletterJid: botUI.channelJid, 
+                    newsletterName: botUI.botName(), 
+                    serverMessageId: 143 
+                },
+                externalAdReply: { 
+                    title: `🎵 ${botUI.botName()} PLAY`, 
+                    body: "Download any song 🎧", 
+                    mediaType: 1, 
+                    mediaUrl: botUI.channelLink, 
+                    sourceUrl: botUI.channelLink, 
+                    thumbnailUrl: botUI.thumbnail, 
+                    showAdAttribution: false, 
+                    renderLargerThumbnail: true 
+                }
+            }
+        }, { quoted: ms });
+    }
+
+    await repondre("⏳ *Searching for your song...*");
 
     try {
-        // ============ STEP 1: SEARCH YOUTUBE ============
-        const search = await yts(query);
-        if (!search.videos.length) {
-            return repondre("❌ *No songs found!*");
-        }
+        const media = await fetchMedia(query, "audio");
+        const caption = generateCaption(media, "audio");
 
-        const video = search.videos[0];
-        const videoUrl = video.url;
-        const videoTitle = video.title;
-        const videoDuration = video.timestamp;
-        const videoThumb = video.thumbnail;
-        const videoChannel = video.author.name;
-        const videoId = video.videoId;
-
-        // Send song info
-        const infoMsg = `╭━━━ *『 RAHMANI MUSIC 』* ━━━╮
-┃
-┃ 🎵 *Title:* ${videoTitle}
-┃ ⏱️ *Duration:* ${videoDuration}
-┃ 👤 *Channel:* ${videoChannel}
-┃
-┃ ⏳ *Downloading audio...*
-┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-_Powered by RAHMANI-XMD_`;
-
-        await zk.sendMessage(dest, {
-            image: { url: videoThumb },
-            caption: infoMsg
+        await client.sendMessage(dest, {
+            audio: { url: media.downloadUrl },
+            mimetype: "audio/mpeg",
+            fileName: `${media.title.replace(/[^\w\s.-]/g, "").substring(0, 45)}.mp3`,
+            ptt: false,
+            mentions: [auteurMessage],
+            contextInfo: getContextInfo(media)
         }, { quoted: ms });
 
-        // ============ STEP 2: TRY ALL YOUR PROVIDED APIS ============
-        let audioUrl = null;
-        let downloadSuccess = false;
-        let downloadErrors = [];
+    } catch (err) {
+        console.error("❌ Play Error:", err.message);
+        await repondre(buildErrorBox(err.message));
+    }
+});
 
-        // Your list of APIs (all in English)
-        const apis = [
-            {
-                name: "DavidCyril MP4",
-                url: `https://apis.davidcyriltech.my.id/download/ytmp4?url=${encodeURIComponent(videoUrl)}`,
-                responsePath: "url" // Expected response: { "url": "..." }
-            },
-            {
-                name: "DavidCyril MP3",
-                url: `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(videoUrl)}`,
-                responsePath: "url" // Expected response: { "url": "..." }
-            },
-            {
-                name: "DarkYasiya",
-                url: `https://www.dark-yasiya-api.site/download/ytmp3?url=${encodeURIComponent(videoUrl)}`,
-                responsePath: "url" // Expected response: { "url": "..." }
-            },
-            {
-                name: "GiftedTech",
-                url: `https://api.giftedtech.web.id/api/download/dlmp3?url=${encodeURIComponent(videoUrl)}&apikey=gifted-md`,
-                responsePath: "result.download" // Expected response: { "result": { "download": "..." } }
-            },
-            {
-                name: "Dreaded",
-                url: `https://api.dreaded.site/api/ytdl/audio?url=${encodeURIComponent(videoUrl)}`,
-                responsePath: "url" // Expected response: { "url": "..." }
-            },
-            // Backup APIs (no key needed)
-            {
-                name: "Diioffc",
-                url: `https://api.diioffc.web.id/api/download/yt?url=${encodeURIComponent(videoUrl)}&type=audio`,
-                responsePath: "result.download" // { "result": { "download": "..." } }
-            },
-            {
-                name: "Akurath",
-                url: `https://api.akurath.com/download/yt?url=${encodeURIComponent(videoUrl)}&type=audio`,
-                responsePath: "url" // { "url": "..." }
-            },
-            {
-                name: "Akuari",
-                url: `https://api.akuari.my.id/downloader/ytplay?query=${encodeURIComponent(videoUrl)}`,
-                responsePath: "result.audio" // { "result": { "audio": "..." } }
-            }
-        ];
+// ═══════════════════════════════════════════════
+//   🎥 COMMAND: .video
+// ═══════════════════════════════════════════════
+zokou({
+    nomCom: "video",
+    categorie: "Download",
+    reaction: "🎥",
+    desc: "Download video from YouTube",
+    fromMe: false
+}, async (dest, client, cmd) => {
+    const { arg, ms, repondre, auteurMessage } = cmd;
+    const query = (arg || []).join(" ").trim();
 
-        // Try each API one by one
-        for (const api of apis) {
-            try {
-                console.log(`📡 Trying API: ${api.name}...`);
-                const response = await axios.get(api.url, { 
-                    timeout: 15000,
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                    }
-                });
-                
-                if (response.data) {
-                    // Handle different response structures
-                    if (api.responsePath === "url" && response.data.url) {
-                        audioUrl = response.data.url;
-                        downloadSuccess = true;
-                        console.log(`✅ ${api.name} success!`);
-                        break;
-                    }
-                    else if (api.responsePath === "result.download" && response.data.result?.download) {
-                        audioUrl = response.data.result.download;
-                        downloadSuccess = true;
-                        console.log(`✅ ${api.name} success!`);
-                        break;
-                    }
-                    else if (api.responsePath === "result.audio" && response.data.result?.audio) {
-                        audioUrl = response.data.result.audio;
-                        downloadSuccess = true;
-                        console.log(`✅ ${api.name} success!`);
-                        break;
-                    }
-                    // Check for alternative response formats
-                    else if (response.data.link) {
-                        audioUrl = response.data.link;
-                        downloadSuccess = true;
-                        console.log(`✅ ${api.name} success (using link)!`);
-                        break;
-                    }
-                    else if (response.data.download) {
-                        audioUrl = response.data.download;
-                        downloadSuccess = true;
-                        console.log(`✅ ${api.name} success (using download)!`);
-                        break;
-                    }
-                    else if (response.data.audio) {
-                        audioUrl = response.data.audio;
-                        downloadSuccess = true;
-                        console.log(`✅ ${api.name} success (using audio)!`);
-                        break;
-                    }
+    if (!query) {
+        return client.sendMessage(dest, {
+            text: buildUsageMessage("video"),
+            mentions: [auteurMessage],
+            contextInfo: {
+                forwardingScore: 999, 
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: { 
+                    newsletterJid: botUI.channelJid, 
+                    newsletterName: botUI.botName(), 
+                    serverMessageId: 143 
+                },
+                externalAdReply: { 
+                    title: `🎥 ${botUI.botName()} VIDEO`, 
+                    body: "Download any video 🎬", 
+                    mediaType: 1, 
+                    mediaUrl: botUI.channelLink, 
+                    sourceUrl: botUI.channelLink, 
+                    thumbnailUrl: botUI.thumbnail, 
+                    showAdAttribution: false, 
+                    renderLargerThumbnail: true 
                 }
-            } catch (error) {
-                downloadErrors.push(`${api.name}: ${error.message}`);
-                console.log(`❌ ${api.name} failed: ${error.message}`);
-                continue; // Try next API
             }
-        }
+        }, { quoted: ms });
+    }
 
-        if (!downloadSuccess || !audioUrl) {
-            console.log("❌ All APIs failed:", downloadErrors);
-            
-            // Send YouTube link as fallback
-            const fallbackMsg = `❌ *Could not download the song*\n\n🔗 *YouTube Link:* ${videoUrl}\n\n📝 *Title:* ${videoTitle}\n\n_Please try downloading manually_`;
-            
-            return await repondre(fallbackMsg);
-        }
+    await repondre("⏳ *Searching for your video...*");
 
-        // ============ STEP 3: SEND AUDIO ============
-        console.log(`✅ Download successful: ${audioUrl.substring(0, 100)}...`);
+    try {
+        const media = await fetchMedia(query, "video");
+        const caption = generateCaption(media, "video");
 
-        await repondre(`📤 *Sending audio...*`);
-
-        // Send audio directly from URL
-        await zk.sendMessage(dest, {
-            audio: { url: audioUrl },
-            mimetype: 'audio/mpeg',
-            ptt: false
+        await client.sendMessage(dest, {
+            video: { url: media.downloadUrl },
+            mimetype: "video/mp4",
+            fileName: `${media.title.replace(/[^\w\s.-]/g, "").substring(0, 45)}.mp4`,
+            caption: caption,
+            mentions: [auteurMessage],
+            contextInfo: getContextInfo(media)
         }, { quoted: ms });
 
-        // Send success message
-        const successMsg = `✅ *Song sent successfully!*\n\n🎵 *${videoTitle}*\n⏱️ *Duration:* ${videoDuration}`;
-
-        await repondre(successMsg);
-        console.log(`✅ Play command completed for: ${videoTitle}`);
-
-    } catch (error) {
-        console.error("❌ Play command error:", error);
-        await repondre(`❌ *Error:* ${error.message}`);
+    } catch (err) {
+        console.error("❌ Video Error:", err.message);
+        await repondre(buildErrorBox(err.message));
     }
 });
