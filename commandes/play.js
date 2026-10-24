@@ -2,6 +2,9 @@ const { zokou } = require("../framework/zokou");
 const conf = require("../set");
 const axios = require("axios");
 const yts = require("yt-search");
+const ffmpeg = require("fluent-ffmpeg");
+const fs = require("fs-extra");
+const path = require("path");
 
 // ═══════════════════════════════════════════════
 //   ⚡ RAHMANI-XMD : MEDIA ENGINE
@@ -14,8 +17,35 @@ const botUI = {
     botName: () => conf.BOT_NAME || "RAHMANI-XMD"
 };
 
+// Function ya ku-convert audio kuwa MP3 halisi
+async function convertToMp3(inputBuffer) {
+    const tempInput = path.join(__dirname, `temp_${Date.now()}.tmp`);
+    const tempOutput = path.join(__dirname, `temp_${Date.now()}.mp3`);
+    fs.writeFileSync(tempInput, inputBuffer);
+
+    return new Promise((resolve, reject) => {
+        ffmpeg(tempInput)
+            .audioCodec("libmp3lame")
+            .format("mp3")
+            .audioBitrate("128k")
+            .audioChannels(2)
+            .audioFrequency(44100)
+            .on("end", () => {
+                const output = fs.readFileSync(tempOutput);
+                fs.unlinkSync(tempInput);
+                fs.unlinkSync(tempOutput);
+                resolve(output);
+            })
+            .on("error", (err) => {
+                if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+                if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
+                reject(err);
+            })
+            .save(tempOutput);
+    });
+}
+
 async function fetchMedia(query, type) {
-    // 1. Search YouTube
     const ytSearch = await yts(query);
     if (!ytSearch.videos || ytSearch.videos.length === 0) {
         throw new Error("No results found on YouTube.");
@@ -24,14 +54,12 @@ async function fetchMedia(query, type) {
     const bestMatch = ytSearch.videos[0];
     const ytUrl = bestMatch.url;
 
-    // 2. Choose API based on type
     let apiEndpoint = type === "audio" 
         ? "https://apiziaul.vercel.app/api/downloader/ytplaymp3"
         : "https://apiziaul.vercel.app/api/downloader/ytmp4";
         
     let params = type === "audio" ? { query: query } : { url: ytUrl };
 
-    // 3. Fetch data from API
     const response = await axios.get(apiEndpoint, { params, timeout: 45000 });
     const json = response.data;
 
@@ -158,10 +186,16 @@ zokou({
 
     try {
         const media = await fetchMedia(query, "audio");
-        const caption = generateCaption(media, "audio");
+        
+        // Download audio kwanza
+        const audioRes = await axios.get(media.downloadUrl, { responseType: "arraybuffer", timeout: 60000 });
+        const audioBuffer = Buffer.from(audioRes.data);
+
+        // Convert kuwa MP3 halisi (Hii inatatua tatizo la "Can't load audio")
+        const mp3Buffer = await convertToMp3(audioBuffer);
 
         await client.sendMessage(dest, {
-            audio: { url: media.downloadUrl },
+            audio: mp3Buffer,
             mimetype: "audio/mpeg",
             fileName: `${media.title.replace(/[^\w\s.-]/g, "").substring(0, 45)}.mp3`,
             ptt: false,
